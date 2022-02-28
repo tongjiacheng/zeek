@@ -633,6 +633,12 @@ else ()
     set(_install_btest_tools_msg "no pcaps")
 endif ()
 
+if ( GEN_ZAM_EXECUTABLE )
+    set(_gen_zam_executable_msg "${GEN_ZAM_EXECUTABLE}")
+else ()
+    set(_gen_zam_executable_msg "built internally")
+endif ()
+
 message(
     "\n====================|  Zeek Build Summary  |===================="
     "\n"
@@ -656,6 +662,7 @@ message(
     "\nAux. Tools:        ${INSTALL_AUX_TOOLS}"
     "\nBTest:             ${INSTALL_BTEST}"
     "\nBTest tooling:     ${_install_btest_tools_msg}"
+    "\nGen-ZAM:           ${_gen_zam_executable_msg}"
     "\nzkg:               ${INSTALL_ZKG}"
     "\n"
     "\nlibmaxminddb:      ${USE_GEOIP}"

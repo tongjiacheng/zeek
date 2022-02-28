@@ -12,6 +12,23 @@ Breaking Changes
 New Functionality
 -----------------
 
+- The new --with-gen-zam configure flag and its corresponding GEN_ZAM_EXECUTABLE
+  cmake variable allow reuse of a previously built Gen-ZAM code generator. This
+  aids cross-compilation: the Zeek build process normally compiles Gen-ZAM on
+  the fly, but when cross-compiling will do so for the target platform, breaking
+  its use on the host platform. Gen-ZAM is similar to binpac and bifcl in this
+  regard.
+
+  Gen-ZAM is not installed with the distribution, since this use case remains
+  rare.  When cross-compiling, the recommended approach is to first configure
+  with a separate --buildroot, then build binpac, bifcl and Gen-ZAM in it
+  (e.g. via "make binpac bifcl Gen-ZAM" when using make), and finally use the
+  resulting build tools in a separate
+
+    configure --with-binpac=... --with-bifcl=... --with-gen-zam=...
+
+  cross-platform build.
+
 Changed Functionality
 ---------------------
 

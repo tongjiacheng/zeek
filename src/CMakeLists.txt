@@ -43,6 +43,25 @@ macro(REPLACE_YY_PREFIX_TARGET inFile outFile yylexPrefix yyPrefix)
     list(APPEND TRANSFORMED_BISON_OUTPUTS ${outFile})
 endmacro(REPLACE_YY_PREFIX_TARGET)
 
+# This macro stores associated headers for any C/C++ source files given
+# as arguments (past _var) as a list in the CMake variable named "_var".
+macro(COLLECT_HEADERS _var)
+    foreach (src ${ARGN})
+        get_filename_component(ext ${src} EXT)
+        if ("${ext}" STREQUAL ".cc" OR "${ext}" STREQUAL ".c")
+            get_filename_component(base ${src} NAME_WE)
+            get_filename_component(dir ${src} PATH)
+            if (NOT "${dir}")
+                set(dir ${CMAKE_CURRENT_SOURCE_DIR})
+            endif ()
+            set(header "${dir}/${base}.h")
+            if (EXISTS ${header})
+                list(APPEND ${_var} ${header})
+            endif ()
+        endif ()
+    endforeach ()
+endmacro(COLLECT_HEADERS _var)
+
 ########################################################################
 ## Create targets to generate parser and scanner code
 
@@ -151,6 +170,24 @@ binpac_target(binpac_zeek-lib.pac)
 list(APPEND BINPAC_OUTPUTS "${BINPAC_OUTPUT_CC}")
 
 ########################################################################
+## Gen-ZAM setup
+
+# Either use the user-provided, pre-existing Gen-ZAM executable
+# or instruct cmake how to build it. Either way, the GEN_ZAM_EXECUTABLE
+# variable contains the path to the executable.
+
+if ( GEN_ZAM_EXECUTABLE )
+    add_executable(Gen-ZAM IMPORTED)
+    set_target_properties(Gen-ZAM PROPERTIES
+        IMPORTED_LOCATION "${GEN_ZAM_EXECUTABLE}")
+else ()
+    set(GEN_ZAM_SRCS script_opt/ZAM/Gen-ZAM.cc)
+    collect_headers(GEN_ZAM_HEADERS ${GEN_ZAM_SRCS})
+    add_executable(Gen-ZAM ${GEN_ZAM_SRCS} ${GEN_ZAM_HEADERS})
+    set(GEN_ZAM_EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/Gen-ZAM)
+endif()
+
+########################################################################
 ## Including subdirectories.
 ########################################################################
 
@@ -212,25 +249,6 @@ if (POLICY CMP0012)
 cmake_policy(SET CMP0012 NEW)
 endif ()
 
-# This macro stores associated headers for any C/C++ source files given
-# as arguments (past _var) as a list in the CMake variable named "_var".
-macro(COLLECT_HEADERS _var)
-    foreach (src ${ARGN})
-        get_filename_component(ext ${src} EXT)
-        if ("${ext}" STREQUAL ".cc" OR "${ext}" STREQUAL ".c")
-            get_filename_component(base ${src} NAME_WE)
-            get_filename_component(dir ${src} PATH)
-            if (NOT "${dir}")
-                set(dir ${CMAKE_CURRENT_SOURCE_DIR})
-            endif ()
-            set(header "${dir}/${base}.h")
-            if (EXISTS ${header})
-                list(APPEND ${_var} ${header})
-            endif ()
-        endif ()
-    endforeach ()
-endmacro(COLLECT_HEADERS _var)
-
 cmake_policy(POP)
 
 # define a command that's used to run the make_dbg_constants.py script
@@ -272,9 +290,9 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ZAM-AssignFlavorsDefs.h
                           ${CMAKE_CURRENT_BINARY_DIR}/ZAM-OpsNamesDefs.h
                           ${CMAKE_CURRENT_BINARY_DIR}/ZAM-Vec1EvalDefs.h
                           ${CMAKE_CURRENT_BINARY_DIR}/ZAM-Vec2EvalDefs.h
-                   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/Gen-ZAM
+                   COMMAND ${GEN_ZAM_EXECUTABLE}
                    ARGS ${CMAKE_CURRENT_SOURCE_DIR}/script_opt/ZAM/Ops.in
-                   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/Gen-ZAM
+                   DEPENDS ${GEN_ZAM_EXECUTABLE}
                            ${CMAKE_CURRENT_SOURCE_DIR}/script_opt/ZAM/Ops.in
                    COMMENT "[sh] Generating ZAM operations"
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -445,10 +463,6 @@ set(THIRD_PARTY_SRCS
     3rdparty/strsep.c
 )
 
-set(GEN_ZAM_SRCS
-    script_opt/ZAM/Gen-ZAM.cc
-)
-
 # Highwayhash. Highwayhash is a bit special since it has architecture dependent code...
 
 set(HH_SRCS
@@ -522,7 +536,6 @@ set(zeek_SRCS
 )
 
 collect_headers(zeek_HEADERS ${zeek_SRCS})
-collect_headers(GEN_ZAM_HEADERS ${GEN_ZAM_SRCS})
 
 add_library(zeek_objs OBJECT ${zeek_SRCS})
 
@@ -537,8 +550,6 @@ target_link_libraries(zeek ${zeekdeps} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS
 set_target_properties(zeek PROPERTIES ENABLE_EXPORTS TRUE)
 
 install(TARGETS zeek DESTINATION bin)
-
-add_executable(Gen-ZAM ${GEN_ZAM_SRCS} ${GEN_ZAM_HEADERS})
 
 # Install wrapper script for Bro-to-Zeek renaming.
 include(InstallSymlink)
